@@ -8,7 +8,80 @@ from bs4 import BeautifulSoup
 import time
 import sqlite3
 
-def is_client_side_rendered(html_content):
+# Function to create the database and table if it doesn't exist
+def create_TechStack_db():
+    conn = sqlite3.connect('TechStack.db')
+    cursor = conn.cursor()
+
+    # Create the table if it doesn't exist
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS tech_stack (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        base_url TEXT,
+        csr BOOLEAN
+    )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+# Function to normalize URLs (remove trailing slashes, make lowercase, and discard anything after the first '/')
+def normalize_url(url):
+    # Remove trailing slashes and convert to lowercase for case-insensitive comparison
+    normalized_url = url.rstrip('/').lower()
+
+    # Discard everything after the first '/'
+    if '/' in normalized_url:
+        normalized_url = normalized_url.split('/')[0]
+
+    return normalized_url
+
+# Function to update the record or insert a new one if the URL doesn't exist
+def update_or_insert_url(base_url, csr):
+    conn = sqlite3.connect('TechStack.db')
+    cursor = conn.cursor()
+
+    # Normalize the URL
+    normalized_url = normalize_url(base_url)
+
+    # Check if the URL already exists in the database
+    cursor.execute('SELECT id FROM tech_stack WHERE LOWER(base_url) = LOWER(?)', (normalized_url,))
+    result = cursor.fetchone()
+
+    if result:
+        # If URL exists, update the CSR value
+        cursor.execute('UPDATE tech_stack SET csr = ? WHERE id = ?', (csr, result[0]))
+    else:
+        # If URL doesn't exist, insert a new record
+        cursor.execute('INSERT INTO tech_stack (base_url, csr) VALUES (?, ?)', (normalized_url, csr))
+
+    conn.commit()
+    conn.close()
+
+# Function to retrieve data by URL
+def retrieve_by_url(base_url):
+    conn = sqlite3.connect('TechStack.db')
+    cursor = conn.cursor()
+
+    # Normalize the URL
+    normalized_url = normalize_url(base_url)
+
+    # Retrieve the data for the URL
+    cursor.execute('SELECT id, base_url, csr FROM tech_stack WHERE LOWER(base_url) = LOWER(?)', (normalized_url,))
+    result = cursor.fetchone()
+
+    conn.close()
+
+    if result:
+        return {
+            "id": result[0],
+            "base_url": result[1],
+            "csr": result[2]
+        }
+    else:
+        return None
+
+def is_client_side_rendered(url, html_content, selenium_content):
     """Determine if a webpage is client-side rendered by checking HTML content."""
     url=normalize_url(url)
     if html_content != selenium_content:
