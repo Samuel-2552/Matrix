@@ -6,15 +6,17 @@ from selenium.common.exceptions import WebDriverException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import time
+import sqlite3
 
 def is_client_side_rendered(html_content):
     """Determine if a webpage is client-side rendered by checking HTML content."""
-    soup = BeautifulSoup(html_content, 'html.parser')
-    text_length = len(soup.get_text(strip=True))
-    # script_count = len(soup.find_all('script'))
-    
-    # If there's very little text but a lot of scripts, it's likely CSR
-    return text_length < 200 # and script_count > 5
+    url=normalize_url(url)
+    if html_content != selenium_content:
+        update_or_insert_url(url, True)  # Client-side rendered
+        return True  # Client-side rendered
+    else:
+        update_or_insert_url(url, False) # Not client-side rendered
+        return False  # Not client-side rendered
 
 def fetch_content(url, retries=3):
     """Fetch webpage content, handle client-side rendering, and return detailed errors if needed."""
@@ -23,9 +25,6 @@ def fetch_content(url, retries=3):
             response = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
             response.raise_for_status()
             html_content = response.text
-            
-            if is_client_side_rendered(html_content):
-                return fetch_with_selenium(url)
             
             return {"status": "success", "content": html_content}
         
